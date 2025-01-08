@@ -9,14 +9,439 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+model User {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  email      String   @unique
+  password   String
+  role       UserRole
+  name       String
+  phone      String?
+  image      String?
+  schoolId   String?  @db.ObjectId
+  schoolName String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // One-to-One relationships
+  teacher      Teacher?
+  student      Student?
+  parent       Parent?
+  RefreshToken RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  token     String   @unique
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model School {
-  id String @id @default(cuid()) // or use @default(uuid()) for UUID
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   name      String
   logo      String?
-  slug String @unique
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  classes    Class[]
+  students   Student[]
+  parents    Parent[]
+  streams    Stream[]
+  Teacher    Teacher[]
+  Department Department[]
+
+  @@map("schools")
+}
+
+model Contact {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  fullName   String
+  email      String @unique
+  phone      String
+  country    String
+  role       String
+  schoolPage String
+  students   Int
+  media      String
+  message    String
+
+  // School relationship
+  // schoolId String @db.ObjectId
+  // school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("contacts")
+}
+
+model Class {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  title String
+  slug  String @unique
+
+  // School relationship
+  schoolId String @db.ObjectId
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  streams  Stream[]  @relation("ClassToStream")
+  students Student[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("classes")
+}
+
+model Stream {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  title String
+  slug  String @unique
+
+  // Class relationship
+  classId String @db.ObjectId
+  class   Class  @relation("ClassToStream", fields: [classId], references: [id], onDelete: Cascade)
+
+  students Student[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  School   School? @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String? @db.ObjectId
+
+  @@map("streams")
+}
+
+model Parent {
+  id              String  @id @default(auto()) @map("_id") @db.ObjectId
+  title           String
+  firstName       String
+  lastName        String
+  relationship    String
+  nin             String  @unique
+  gender          String
+  dob             String
+  phone           String  @unique
+  nationality     String
+  whatsappNo      String?
+  occupation      String
+  preferredMethod String
+  email           String  @unique
+  password        String
+  address         String
+  imageUrl        String?
+
+  // School relationship
+  schoolId String @db.ObjectId
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  students Student[]
+
+  // Parent specific fields can go here
+  userId String @unique @db.ObjectId // Foreign key to User
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("parents")
+}
+
+model Student {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  firstName   String
+  lastName    String
+  middleName  String?
+  gender      String
+  dob         DateTime
+  nationality String
+  classTitle  String?
+  parentName  String?
+  streamTitle String?
+  studentType String?  @default("PS")
+
+  // School relationship
+  schoolId String @db.ObjectId
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Existing relationships
+  classId  String @db.ObjectId
+  parentId String @db.ObjectId
+  streamId String @db.ObjectId
+
+  class  Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  parent Parent @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  stream Stream @relation(fields: [streamId], references: [id], onDelete: Cascade)
+
+  email         String   @unique
+  rollNo        String   @unique
+  regNo         String   @unique
+  password      String
+  phone         String
+  address       String
+  admissionDate DateTime
+  imageUrl      String?
+
+  // Student specific fields can go here
+  userId String @unique @db.ObjectId // Foreign key to User
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("students")
+}
+
+model Teacher {
+  id                           String    @id @default(auto()) @map("_id") @db.ObjectId
+  title                        String?
+  firstName                    String
+  lastName                     String
+  email                        String    @unique
+  phone                        String    @unique
+  whatAppNum                   String
+  gender                       Gender
+  dob                          DateTime?
+  nin                          String    @unique
+  imageUrl                     String
+  password                     String
+  isActive                     Boolean   @default(true)
+  lastLogin                    DateTime?
+  employeeId                   String?   @unique
+  dateOfJoining                DateTime
+  designation                  String
+  departmentName               String?
+  mainSubject                  String?
+  mainSubjectId                String?
+  qualification                String
+  address                      String?
+  nationality                  String?
+  preferredMethod              String?
+  city                         String?
+  state                        String?
+  country                      String?
+  postalCode                   String?
+  emergencyContactName         String?
+  emergencyContactPhone        String?
+  emergencyContactRelationship String?
+  experience                   Int?
+  bio                          String?   @db.String
+  skills                       String?
+
+  attendance TeacherAttendance[]
+  leaves     TeacherLeave[]
+
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  departmentId String     @db.ObjectId
+
+  // Teacher specific fields can go here
+  userId String @unique @db.ObjectId // Foreign key to User
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  School          School?           @relation(fields: [schoolId], references: [id])
+  schoolId        String?           @db.ObjectId
+  subjects        String[]
+  classes         String[]
+  classIds        String[]
+  TeacherDocument TeacherDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("teachers")
+}
+
+// model SubjectTeacher {
+//   id        String   @id @default(auto()) @map("_id") @db.ObjectId
+//   teacher   Teacher  @relation(fields: [teacherId], references: [id])
+//   teacherId String
+//   subject   Subject  @relation(fields: [subjectId], references: [id])
+//   subjectId String
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+// }
+
+model Subject {
+  id           String          @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  slug         String          @unique
+  code         String
+  shortName    String?
+  category     SubjectCategory
+  type         SubjectType
+  passingMark  Int?
+  totalMarks   Int?
+  isActive     Boolean         @default(true)
+  isOptional   Boolean         @default(true)
+  hasTheory    Boolean         @default(true)
+  hasPractical Boolean         @default(true)
+  labRequired  Boolean         @default(true)
+
+  department     Department @relation(fields: [departmentId], references: [id])
+  departmentId   String     @db.ObjectId
+  departmentName String
+
+  // School          School?           @relation(fields: [schoolId], references: [id])
+  // schoolId        String?           @db.ObjectId
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subjects")
+}
+
+enum SubjectCategory {
+  CORE
+  ELECTIVE
+  ADDITIONAL
+  VOCATIONAL
+  LANGUAGE
+  EXTRA_CURRICULAR
+}
+
+enum SubjectType {
+  THEORY
+  PRACTICAL
+  BOTH
+}
+
+// model ClassTeacher {
+//   id            String   @id @default(auto()) @map("_id") @db.ObjectId
+//   teacher       Teacher  @relation(fields: [teacherId], references: [id])
+//   teacherId     String
+//   class         Class    @relation(fields: [classId], references: [id])
+//   classId       String
+//   isMainTeacher Boolean  @default(false)
+//   academicYear  String
+//   createdAt     DateTime @default(now())
+//   updatedAt     DateTime @updatedAt
+// }
+
+model TeacherDocument {
+  id        String       @id @default(auto()) @map("_id") @db.ObjectId
+  teacher   Teacher      @relation(fields: [teacherId], references: [id])
+  teacherId String       @db.ObjectId
+  type      DocumentType
+  title     String
+  url       String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([teacherId])
+  @@map("TeacherDocuments")
+}
+
+model Department {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  slug         String    @unique
+  hodId        String?
+  hodName      String?
+  hodStartDate DateTime?
+  budget       Float?
+  budgetYear   String?
+
+  teachers Teacher[]
+  subjects Subject[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  School   School? @relation(fields: [schoolId], references: [id])
+  schoolId String? @db.ObjectId
+
+  @@map("departments")
+}
+
+model TeacherAttendance {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  date      DateTime
+  status    AttendanceStatus
+  checkIn   DateTime
+  checkout  DateTime
+  note      String?
+  teacher   Teacher          @relation(fields: [teacherId], references: [id])
+  teacherId String           @db.ObjectId
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([teacherId, date])
+  @@map("teacherAttendances")
+}
+
+model TeacherLeave {
+  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  startDate  DateTime
+  endDate    DateTime
+  type       LeaveType
+  reason     String
+  status     LeaveStatus @default(PENDING)
+  approvedBy String?
+  approvedAt DateTime?
+  teacher    Teacher     @relation(fields: [teacherId], references: [id])
+  teacherId  String      @db.ObjectId
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([teacherId])
+  @@map("teacherLeaves")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum DocumentType {
+  CERTIFICATE
+  ID_PROOF
+  QUALIFICATION
+  CONTRACT
+  OTHER
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  ON_LEAVE
+}
+
+enum LeaveType {
+  SICK
+  CASUAL
+  VACATION
+  MATERNITY
+  PATERNITY
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
 }
